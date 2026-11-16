@@ -256,3 +256,7 @@ DataAlgFORGEANT.root
 .claude/
 .codex/
 .aider.*
+
+# Local IDEA builds
+build-local/
+install-local/
