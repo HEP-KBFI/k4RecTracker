@@ -706,7 +706,7 @@ GenfitTrack::HelperInitialization GenfitTrack::ComputeInitialParameters(double B
   FastCircleFit circle(points_xy);
 
   Point2D_xy closestPoint = circle.closestPointTo(referencePoint_xy);
-  Point2D_xy tangent_xy = circle.tangentAtPCA(closestPoint, points_xy[1]);
+  Point2D_xy tangent_xy = circle.tangentAtPCA(closestPoint, points_xy);
 
   double rho = circle.rho();
   double init_pT = std::abs(rho * 0.3 * Bz) / 1000.0; // 1000 is used to convert from m to mm
@@ -881,6 +881,7 @@ bool GenfitTrack::Fit(edm4hep::TrackerHitPlaneCollection& fittedHits, std::strin
 
   const bool showFitDiagnostics = (debug_lvl == 1 || debug_lvl == 2);
   const bool showFitterDiagnostics = (debug_lvl == 1);
+  m_fittedCharge.reset();
 
   edm4hep::Track Track_temp = m_edm4hepTrack;
   for (size_t i = 0; i < Track_temp.trackStates_size(); ++i) {
@@ -1079,6 +1080,13 @@ bool GenfitTrack::Fit(edm4hep::TrackerHitPlaneCollection& fittedHits, std::strin
     edm4hep::TrackState trackStateFirstHit;
     try {
       fittedState = genfitTrack.getFittedState();
+      if (showFitDiagnostics) {
+        const auto momentum = fittedState.getMom();
+        std::clog << "GENFIT_ORIENTATION track=" << m_originalTrack.getObjectID().index
+                  << " seed_charge=" << m_chargeHypothesis << " fitted_charge=" << fittedState.getCharge()
+                  << " seed_momentum=" << m_momInit.X() << "," << m_momInit.Y() << "," << m_momInit.Z()
+                  << " fitted_momentum=" << momentum.X() << "," << momentum.Y() << "," << momentum.Z() << std::endl;
+      }
       trackStateFirstHit = UpdateTrackState(fittedState, m_firstHitReferencePoint, edm4hep::TrackState::AtFirstHit);
     } catch (const std::exception& e) {
       if (showFitDiagnostics) {
@@ -1198,6 +1206,9 @@ bool GenfitTrack::Fit(edm4hep::TrackerHitPlaneCollection& fittedHits, std::strin
 
     m_edm4hepTrack.setChi2(genfitTrack.getFitStatus()->getChi2());
     m_edm4hepTrack.setNdf(genfitTrack.getFitStatus()->getNdf());
+    // The Kalman fit can change the sign of q/p relative to the seed.
+    // Calorimeter extrapolation must use the fitted charge as well.
+    m_fittedCharge = static_cast<int>(fittedState.getCharge());
 
     m_trackWithFit.setChi2(genfitTrack.getFitStatus()->getChi2());
     m_trackWithFit.setNdf(genfitTrack.getFitStatus()->getNdf());
@@ -1472,7 +1483,7 @@ TMatrixDSym GenfitTrack::CovarianceMatrixCartesianToHelix(const TMatrixDSym& C_c
  * @param location Location identifier for the track state (e.g. AtIP, AtFirstHit, AtLastHit)
  *
  * @note The magnetic field is retrieved at the current position and converted to Tesla.
- * @note The curvature sign (omega) depends on the assumed particle charge hypothesis.
+ * @note The curvature sign and covariance use the fitted charge, which can differ from the seed hypothesis.
  */
 edm4hep::TrackState GenfitTrack::UpdateTrackState(genfit::MeasuredStateOnPlane measuredState, TVector3 referencePointCm,
                                                   int location) {
@@ -1504,8 +1515,9 @@ edm4hep::TrackState GenfitTrack::UpdateTrackState(genfit::MeasuredStateOnPlane m
   double bzTesla = m_fieldMap->getBz(positionCm) / (dd4hep::tesla / dd4hep::kilogauss);
 
   double tanLambda = pzGeV / ptGeV;
+  const int fittedCharge = static_cast<int>(measuredState.getCharge());
   double omegaPerMm = std::abs(ConversionUnits::a_lcio * bzTesla / ptGeV);
-  if (m_chargeHypothesis < 0)
+  if (fittedCharge < 0)
     omegaPerMm = -omegaPerMm;
 
   Edm4hepTrackState.D0 = d0Mm;
@@ -1520,7 +1532,7 @@ edm4hep::TrackState GenfitTrack::UpdateTrackState(genfit::MeasuredStateOnPlane m
   Edm4hepTrackState.location = location;
 
   TMatrixDSym covarianceHelix = CovarianceMatrixCartesianToHelix(covarianceCmGeV, positionCm, momentumGeV,
-                                                                 referencePointCm, m_chargeHypothesis, bzTesla);
+                                                                 referencePointCm, fittedCharge, bzTesla);
 
   // Conversion from TMatrixDSym(5x5) to lower-triangular packed format used in edm4hep::TrackState
   for (int i = 0; i < 5; ++i) {

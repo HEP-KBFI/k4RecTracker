@@ -61,6 +61,14 @@ target_include_directories(${PackageName} PUBLIC
 
 set_target_properties(${PackageName} PROPERTIES PUBLIC_HEADER "${headers}")
 
+if(BUILD_TESTING)
+  add_executable(test_FastCircleSeed test/testFastCircleSeed.cpp)
+  target_include_directories(test_FastCircleSeed PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MarlinUtil_INCLUDE_DIRS} ${DELPHES_INCLUDE_DIRS})
+  target_link_libraries(test_FastCircleSeed PRIVATE DD4hep::DDRec EDM4HEP::edm4hep Eigen3::Eigen ROOT::Geom ROOT::Matrix)
+  add_test(NAME test_FastCircleSeed COMMAND test_FastCircleSeed
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/inputFiles/circle_seed_reversed_inner_hits.txt)
+endif()
+
 file(GLOB scripts
   ${PROJECT_SOURCE_DIR}/test/*.py
 )

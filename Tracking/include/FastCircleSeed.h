@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 
 #include "utils.h"
@@ -50,9 +51,6 @@ public:
   }
 
   Point2D_xy tangentAtPCA(const Point2D_xy& pca, const Point2D_xy& nextHit) const {
-
-    Point2D_xy tangent;
-
     double dx = pca.x - x0_;
     double dy = pca.y - y0_;
     double dx_next = nextHit.x - x0_;
@@ -60,23 +58,30 @@ public:
 
     // cross product Z component
     double crossZ = dx * dy_next - dy * dx_next;
-    if (crossZ < 0) {
+    return unitTangent(pca, crossZ >= 0);
+  }
 
-      tangent.x = dy;
-      tangent.y = -dx;
-    } else {
-
-      tangent.x = -dy;
-      tangent.y = dx;
+  // Determine the flight direction from the ordered measurements, rather than
+  // assuming that the second measurement is ahead of the fitted PCA. A few
+  // misassigned inner hits can put that measurement behind the PCA and reverse
+  // both the transverse seed momentum and the inferred charge. The accumulated
+  // signed turns use the entire trajectory and also handle arcs beyond pi.
+  Point2D_xy tangentAtPCA(const Point2D_xy& pca, const std::vector<Point2D_xy>& orderedHits) const {
+    if (orderedHits.size() < 2) {
+      throw std::invalid_argument("Circle seed orientation needs at least two ordered hits");
     }
-
-    double norm = std::sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
-    if (norm > 0) {
-      tangent.x /= norm;
-      tangent.y /= norm;
+    double turn = 0.;
+    for (std::size_t i = 1; i < orderedHits.size(); ++i) {
+      const double ax = orderedHits[i - 1].x - x0_;
+      const double ay = orderedHits[i - 1].y - y0_;
+      const double bx = orderedHits[i].x - x0_;
+      const double by = orderedHits[i].y - y0_;
+      turn += std::atan2(ax * by - ay * bx, ax * bx + ay * by);
     }
-
-    return tangent;
+    if (turn == 0.) {
+      return tangentAtPCA(pca, orderedHits.back());
+    }
+    return unitTangent(pca, turn > 0.);
   }
 
   double x0() const { return x0_; }
@@ -85,6 +90,18 @@ public:
   double chi2() const { return chi2_; }
 
 private:
+  Point2D_xy unitTangent(const Point2D_xy& pca, bool counterclockwise) const {
+    const double dx = pca.x - x0_;
+    const double dy = pca.y - y0_;
+    Point2D_xy tangent = counterclockwise ? Point2D_xy{-dy, dx} : Point2D_xy{dy, -dx};
+    const double norm = std::hypot(tangent.x, tangent.y);
+    if (norm > 0.) {
+      tangent.x /= norm;
+      tangent.y /= norm;
+    }
+    return tangent;
+  }
+
   template <typename C>
   void calculate(const std::vector<Point2D_xy>& pts, C& x, C& y, C& z, C& weight) {
     const size_t N = pts.size();

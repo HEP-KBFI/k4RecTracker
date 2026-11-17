@@ -21,6 +21,7 @@
 #define GENFIT_TRACK_H
 
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -107,7 +108,7 @@ public:
   edm4hep::MutableTrack& GetTrack_edm4hep() { return m_edm4hepTrack; }
   edm4hep::MutableTrack& GetTrackWithFit_edm4hep() { return m_trackWithFit; }
 
-  int GetCharge() { return m_chargeHypothesis; }
+  int GetCharge() const { return m_fittedCharge.value_or(m_chargeHypothesis); }
 
   void SetVPPosition(TVector3 referencePoint) { m_vpReferencePoint = referencePoint; }
 
@@ -160,6 +161,7 @@ private:
 
   int m_signedParticleHypothesis = 211;
   int m_chargeHypothesis = 1;
+  std::optional<int> m_fittedCharge;
 
   TVector3 m_posInit = TVector3(0., 0., 0.);
   TVector3 m_momInit = TVector3(0., 0., 0.);
