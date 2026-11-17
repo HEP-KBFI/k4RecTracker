@@ -62,6 +62,11 @@ target_include_directories(${PackageName} PUBLIC
 set_target_properties(${PackageName} PROPERTIES PUBLIC_HEADER "${headers}")
 
 if(BUILD_TESTING)
+  add_executable(test_TrackStateAccess test/testTrackStateAccess.cpp)
+  target_include_directories(test_TrackStateAccess PRIVATE ${PROJECT_SOURCE_DIR}/include)
+  target_link_libraries(test_TrackStateAccess PRIVATE EDM4HEP::edm4hep)
+  add_test(NAME test_TrackStateAccess COMMAND test_TrackStateAccess)
+
   add_executable(test_FastCircleSeed test/testFastCircleSeed.cpp)
   target_include_directories(test_FastCircleSeed PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MarlinUtil_INCLUDE_DIRS} ${DELPHES_INCLUDE_DIRS})
   target_link_libraries(test_FastCircleSeed PRIVATE DD4hep::DDRec EDM4HEP::edm4hep Eigen3::Eigen ROOT::Geom ROOT::Matrix)

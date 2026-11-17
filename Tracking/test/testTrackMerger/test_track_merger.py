@@ -178,7 +178,10 @@ def write_input_file(path: str, mode: str) -> None:
     frame.put(outer_hits, "OuterHits")
 
     writer.write_frame(frame, "events")
-    writer.finish()
+    # PODIO 1.7 finalizes on destruction; newer writers expose finish().
+    if hasattr(writer, "finish"):
+        writer.finish()
+    del writer
     print(f"[setup] Wrote input file: {path}")
 
 

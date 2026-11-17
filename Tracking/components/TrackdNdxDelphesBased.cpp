@@ -1,4 +1,5 @@
 #include "TrackdNdxDelphesBased.h"
+#include "TrackStateAccess.h"
 
 // Gaudi
 #include <GaudiKernel/MsgStream.h>
@@ -146,7 +147,7 @@ edm4hep::RecDqdxCollection TrackdNdxDelphesBased::operator()(const edm4hep::Trac
     // Track Information //
     ///////////////////////
     // Use track state at IP, since this corresponds to delphes and energy loss in tracking system is negligible
-    const auto track_state = track.getTrackState(edm4hep::TrackState::AtIP).value();
+    const auto track_state = k4RecTracker::trackStateAt(track, edm4hep::TrackState::AtIP).value();
 
     // Convert edm4hep::TrackState to delphes parameters
     // Inverse conversion from

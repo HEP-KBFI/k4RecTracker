@@ -18,6 +18,7 @@
  */
 
 #include "Gaudi/Accumulators.h"
+#include "TrackStateAccess.h"
 #include "edm4hep/Track.h"
 #include "edm4hep/TrackCollection.h"
 #include "edm4hep/TrackState.h"
@@ -184,10 +185,10 @@ struct TrackMerger final : k4FWCore::Transformer<TrackColl(const TrackColl&, con
   }
 
 private:
-  bool isMatch(const edm4hep::Track& t1, edm4hep::TrackState::Location loc1, const edm4hep::Track& t2,
-               edm4hep::TrackState::Location loc2) const {
-    auto ts1 = t1.getTrackState(loc1);
-    auto ts2 = t2.getTrackState(loc2);
+  bool isMatch(const edm4hep::Track& t1, decltype(edm4hep::TrackState::AtIP) loc1, const edm4hep::Track& t2,
+               decltype(edm4hep::TrackState::AtIP) loc2) const {
+    auto ts1 = k4RecTracker::trackStateAt(t1, loc1);
+    auto ts2 = k4RecTracker::trackStateAt(t2, loc2);
 
     if (!ts1.has_value() || !ts2.has_value()) {
       // It's common for some tracks to lack specific states; verbose instead of debug to avoid spam
