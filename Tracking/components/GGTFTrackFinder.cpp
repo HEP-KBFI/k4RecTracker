@@ -41,8 +41,6 @@
 // k4FWCore
 #include "k4FWCore/Transformer.h"
 
-// podio
-#include "podio/ObjectID.h"
 
 // EDM4HEP
 #include "edm4hep/SenseWireHitCollection.h"
@@ -225,7 +223,8 @@ private:
    */
   struct HitRef {
     HitType type;
-    podio::ObjectID hitID; // Source hit: collectionID identifies the input collection, index the position in it.
+    std::size_t collectionIndex; // Position in the corresponding input collection list.
+    std::size_t hitIndex;        // Position in the input collection, including subset collections.
   };
 
   /**
@@ -295,7 +294,8 @@ private:
   static void appendPlanarHits(const std::vector<const edm4hep::TrackerHitPlaneCollection*>& collections,
                                Workspace& workspace) {
     float* featureOut = workspace.features.data() + workspace.hitRefs.size() * kFeatureCount;
-    for (const auto* collection : collections) {
+    for (std::size_t collectionIndex = 0; collectionIndex < collections.size(); ++collectionIndex) {
+      const auto* collection = collections[collectionIndex];
       for (std::size_t hitIndex = 0; hitIndex < collection->size(); ++hitIndex) {
         const auto hit = collection->at(hitIndex);
         const auto position = hit.getPosition();
@@ -313,7 +313,7 @@ private:
         featureOut[6] = 0.0F;
         featureOut += kFeatureCount;
 
-        workspace.hitRefs.push_back({HitType::Planar, hit.id()});
+        workspace.hitRefs.push_back({HitType::Planar, collectionIndex, hitIndex});
       }
     }
   }
@@ -340,7 +340,8 @@ private:
   void appendWireHits(const std::vector<const edm4hep::SenseWireHitCollection*>& collections,
                       Workspace& workspace) const {
     float* featureOut = workspace.features.data() + workspace.hitRefs.size() * kFeatureCount;
-    for (const auto* collection : collections) {
+    for (std::size_t collectionIndex = 0; collectionIndex < collections.size(); ++collectionIndex) {
+      const auto* collection = collections[collectionIndex];
       for (std::size_t hitIndex = 0; hitIndex < collection->size(); ++hitIndex) {
         const auto hit = collection->at(hitIndex);
         const edm4hep::Vector3d wirePosition = hit.getPosition();
@@ -369,7 +370,7 @@ private:
         featureOut[6] = static_cast<float>(2.0 * distanceToWire * xPrimeZ);
         featureOut += kFeatureCount;
 
-        workspace.hitRefs.push_back({HitType::Wire, hit.id()});
+        workspace.hitRefs.push_back({HitType::Wire, collectionIndex, hitIndex});
       }
     }
   }
@@ -591,29 +592,9 @@ private:
       for (std::uint32_t position = begin; position < end; ++position) {
         const HitRef& hitRef = workspace.hitRefs[order[position]];
         if (hitRef.type == HitType::Planar) {
-          const edm4hep::TrackerHitPlaneCollection* sourceCollection = nullptr;
-          for (const auto* collection : planarCollections) {
-            if (collection->getID() == hitRef.hitID.collectionID) {
-              sourceCollection = collection;
-              break;
-            }
-          }
-          if (sourceCollection == nullptr) {
-            throw std::runtime_error("Hit reference points to a collection that is not among the inputs");
-          }
-          outputTrack.addToTrackerHits(sourceCollection->at(hitRef.hitID.index));
+          outputTrack.addToTrackerHits(planarCollections.at(hitRef.collectionIndex)->at(hitRef.hitIndex));
         } else {
-          const edm4hep::SenseWireHitCollection* sourceCollection = nullptr;
-          for (const auto* collection : wireCollections) {
-            if (collection->getID() == hitRef.hitID.collectionID) {
-              sourceCollection = collection;
-              break;
-            }
-          }
-          if (sourceCollection == nullptr) {
-            throw std::runtime_error("Hit reference points to a collection that is not among the inputs");
-          }
-          outputTrack.addToTrackerHits(sourceCollection->at(hitRef.hitID.index));
+          outputTrack.addToTrackerHits(wireCollections.at(hitRef.collectionIndex)->at(hitRef.hitIndex));
         }
       }
     }
